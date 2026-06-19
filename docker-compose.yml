@@ -1,0 +1,15 @@
+services:
+  agent:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_API_KEY=${SERVER_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - DB_PATH=/app/data/agent.db
+    volumes:
+      - ./data:/app/data               # SQLite file, mudah di-backup
+      - ./custom-skills:/app/custom-skills
+    restart: unless-stopped

@@ -1,0 +1,22 @@
+server:
+  port: 8080
+  api_key: "your-secret-api-key"
+
+llm:
+  base_url: "https://api.openai.com/v1"  # atau http://localhost:11434/v1 untuk Ollama
+  api_key: "sk-xxx"
+  model: "gpt-4o"
+  timeout_seconds: 30
+
+db:
+  path: "./data/agent.db"   # SQLite untuk sessions, dibuat otomatis
+
+# Konfigurasi untuk memanggil API sistem klien (POS, Ecommerce, dll)
+# Skills menggunakan ini untuk fetch data dari sistem yang sudah berjalan
+client_api:
+  base_url: "http://localhost:3000"   # ganti dengan URL API sistem klien
+  auth_header: "Bearer xxx"           # opsional, sesuai autentikasi sistem klien
+  timeout_seconds: 10
+
+skills:
+  custom_path: "./custom-skills/"     # folder berisi skill klien (.py/.js + .manifest.json)

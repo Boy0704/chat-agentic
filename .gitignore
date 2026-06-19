@@ -1,0 +1,23 @@
+# Binary
+agent-service
+
+# Config dengan secrets
+config.yaml
+.env
+
+# SQLite database (data runtime)
+data/
+
+# Go build cache
+*.test
+*.out
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
