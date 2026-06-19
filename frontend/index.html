@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Agent Service — Dev UI</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     .typing-cursor::after {
       content: '▋';
@@ -12,7 +13,40 @@
     }
     @keyframes blink { 50% { opacity: 0; } }
     #messages { scroll-behavior: smooth; }
-    pre { white-space: pre-wrap; word-break: break-word; }
+
+    /* Markdown styles */
+    .md-body p              { margin-bottom: 0.6em; }
+    .md-body p:last-child   { margin-bottom: 0; }
+    .md-body h1, .md-body h2, .md-body h3, .md-body h4 {
+      font-weight: 600; margin: 0.8em 0 0.4em;
+    }
+    .md-body h1 { font-size: 1.2em; }
+    .md-body h2 { font-size: 1.1em; }
+    .md-body h3 { font-size: 1em; }
+    .md-body ul  { list-style: disc;    padding-left: 1.4em; margin-bottom: 0.6em; }
+    .md-body ol  { list-style: decimal; padding-left: 1.4em; margin-bottom: 0.6em; }
+    .md-body li  { margin-bottom: 0.2em; }
+    .md-body code {
+      background: #f3f4f6; border-radius: 4px;
+      padding: 0.1em 0.35em; font-size: 0.85em; font-family: monospace;
+    }
+    .md-body pre {
+      background: #1e1e2e; color: #cdd6f4;
+      border-radius: 8px; padding: 12px; margin: 0.6em 0;
+      overflow-x: auto; font-size: 0.82em;
+    }
+    .md-body pre code { background: none; padding: 0; color: inherit; }
+    .md-body blockquote {
+      border-left: 3px solid #d1d5db; padding-left: 12px;
+      color: #6b7280; margin: 0.6em 0;
+    }
+    .md-body a    { color: #4f46e5; text-decoration: underline; }
+    .md-body strong { font-weight: 600; }
+    .md-body em   { font-style: italic; }
+    .md-body table { border-collapse: collapse; width: 100%; margin: 0.6em 0; font-size: 0.85em; }
+    .md-body th, .md-body td { border: 1px solid #e5e7eb; padding: 4px 10px; }
+    .md-body th   { background: #f9fafb; font-weight: 600; }
+    .md-body hr   { border: none; border-top: 1px solid #e5e7eb; margin: 0.8em 0; }
   </style>
 </head>
 <body class="bg-gray-100 h-screen flex flex-col">
@@ -198,7 +232,7 @@
         </div>
         <div id="skill-events" class="flex flex-wrap gap-1 mb-1"></div>
         <div class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm text-gray-800 shadow-sm">
-          <pre id="reply-text" class="font-sans typing-cursor"></pre>
+          <div id="reply-text" class="md-body typing-cursor"></div>
         </div>
         <div id="done-meta" class="text-xs text-gray-400 mt-1 hidden"></div>
       </div>`;
@@ -304,6 +338,7 @@
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = '';
+      let rawText = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -320,7 +355,8 @@
 
           switch (event.type) {
             case 'token':
-              replyEl.textContent += event.content;
+              rawText += event.content;
+              replyEl.innerHTML = marked.parse(rawText);
               msgs.scrollTop = msgs.scrollHeight;
               break;
             case 'skill_start':
@@ -329,6 +365,7 @@
               break;
             case 'done':
               replyEl.classList.remove('typing-cursor');
+              replyEl.innerHTML = marked.parse(rawText);
               if (event.skills_used?.length) {
                 metaEl.textContent = `Skills: ${event.skills_used.join(', ')} · ID: ${event.message_id}`;
                 metaEl.classList.remove('hidden');
@@ -378,7 +415,7 @@
 
       setStatus('ok');
       replyEl.classList.remove('typing-cursor');
-      replyEl.textContent = data.reply;
+      replyEl.innerHTML = marked.parse(data.reply);
 
       if (data.skills_used?.length) {
         data.skills_used.forEach(s => appendSkillEvent(bubble, 'skill_result', s));
