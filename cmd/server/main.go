@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -21,24 +22,25 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	openai "github.com/sashabaranov/go-openai"
+	"gopkg.in/natefinch/lumberjack.v2"
 	_ "modernc.org/sqlite"
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-
 	cfgPath := flag.String("config", "config.yaml", "path to config file")
 	flag.Parse()
 
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
-		logger.Error("load config", "error", err)
+		slog.Error("load config", "error", err)
 		os.Exit(1)
 	}
 	if err := cfg.Validate(); err != nil {
-		logger.Error("invalid config", "error", err)
+		slog.Error("invalid config", "error", err)
 		os.Exit(1)
 	}
+
+	logger := buildLogger(cfg.Log)
 
 	// SQLite — hanya untuk sessions, bukan data klien
 	if err := os.MkdirAll(filepath.Dir(cfg.DB.Path), 0755); err != nil {
@@ -125,4 +127,33 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	srv.Shutdown(ctx)
+}
+
+func buildLogger(cfg config.LogConfig) *slog.Logger {
+	level := slog.LevelInfo
+	switch cfg.Level {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	}
+
+	opts := &slog.HandlerOptions{Level: level}
+
+	var w io.Writer = os.Stdout
+	if cfg.Path != "" {
+		if err := os.MkdirAll(filepath.Dir(cfg.Path), 0755); err == nil {
+			w = &lumberjack.Logger{
+				Filename:   cfg.Path,
+				MaxSize:    cfg.MaxSizeMB,
+				MaxAge:     cfg.MaxAgeDays,
+				MaxBackups: cfg.MaxBackups,
+				Compress:   cfg.Compress,
+			}
+		}
+	}
+
+	return slog.New(slog.NewJSONHandler(w, opts))
 }

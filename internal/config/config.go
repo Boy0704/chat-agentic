@@ -15,6 +15,16 @@ type Config struct {
 	DB        DBConfig        `yaml:"db"`
 	ClientAPI ClientAPIConfig `yaml:"client_api"`
 	Skills    SkillsConfig    `yaml:"skills"`
+	Log       LogConfig       `yaml:"log"`
+}
+
+type LogConfig struct {
+	Path       string `yaml:"path"`        // kosong = stdout
+	Level      string `yaml:"level"`       // debug | info | warn | error
+	MaxSizeMB  int    `yaml:"max_size_mb"` // per file, default 100
+	MaxAgeDays int    `yaml:"max_age_days"`
+	MaxBackups int    `yaml:"max_backups"`
+	Compress   bool   `yaml:"compress"`
 }
 
 type ServerConfig struct {
@@ -69,7 +79,14 @@ func Load(path string) (*Config, error) {
 		},
 		LLM:       LLMConfig{TimeoutSeconds: 30},
 		ClientAPI: ClientAPIConfig{TimeoutSeconds: 10},
-		Skills:    SkillsConfig{TimeoutSeconds: 30},
+		Skills: SkillsConfig{TimeoutSeconds: 30},
+		Log: LogConfig{
+			Level:      "info",
+			MaxSizeMB:  100,
+			MaxAgeDays: 30,
+			MaxBackups: 5,
+			Compress:   true,
+		},
 	}
 
 	if path != "" {

@@ -36,3 +36,13 @@ client_api:
 skills:
   custom_path: "./custom-skills/"     # folder berisi skill klien (.py/.js + .manifest.json)
   timeout_seconds: 30                 # timeout per eksekusi script skill
+
+log:
+  # path: ""                          # kosong = log ke stdout (cocok untuk Docker)
+  # Untuk on-premise tanpa Docker, set path ke file:
+  # path: "./logs/agent.log"
+  level: "info"                       # debug | info | warn | error
+  max_size_mb: 100                    # ukuran maksimum per file log sebelum di-rotate
+  max_age_days: 30                    # hapus log lama setelah N hari
+  max_backups: 5                      # jumlah file lama yang disimpan
+  compress: true                      # kompres file rotasi dengan gzip
