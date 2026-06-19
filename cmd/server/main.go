@@ -96,7 +96,7 @@ func main() {
 
 	agentSvc := agent.New(llmClient, cfg.LLM.Model, registry, logger)
 	handler := api.NewHandler(agentSvc, sessionStore, registry)
-	router := api.SetupRouter(handler, cfg.Server.APIKey)
+	router := api.SetupRouter(handler, cfg.Server.APIKey, cfg.Server.CORS)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),

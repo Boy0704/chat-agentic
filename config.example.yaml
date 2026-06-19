@@ -1,6 +1,12 @@
 server:
   port: 8080
   api_key: "your-secret-api-key"
+  cors:
+    # Daftar origin yang diizinkan akses API ini.
+    # Default: semua origin diizinkan ["*"]
+    # Untuk production, ganti dengan domain chatbot klien:
+    # allow_origins: ["https://app.klien.com", "https://pos.klien.com"]
+    allow_origins: ["*"]
 
 llm:
   base_url: "https://api.openai.com/v1"  # atau http://localhost:11434/v1 untuk Ollama

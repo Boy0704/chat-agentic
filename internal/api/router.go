@@ -1,11 +1,19 @@
 package api
 
-import "github.com/gin-gonic/gin"
+import (
+	"time"
 
-func SetupRouter(h *Handler, apiKey string) *gin.Engine {
+	"agent-service/internal/config"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+)
+
+func SetupRouter(h *Handler, apiKey string, corsCfg config.CORSConfig) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(gin.Logger())
+	r.Use(corsMiddleware(corsCfg))
 
 	r.GET("/health", h.Health)
 
@@ -19,4 +27,20 @@ func SetupRouter(h *Handler, apiKey string) *gin.Engine {
 	}
 
 	return r
+}
+
+func corsMiddleware(cfg config.CORSConfig) gin.HandlerFunc {
+	origins := cfg.AllowOrigins
+	if len(origins) == 0 {
+		origins = []string{"*"}
+	}
+
+	return cors.New(cors.Config{
+		AllowOrigins:     origins,
+		AllowMethods:     []string{"GET", "POST", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Type"},
+		AllowCredentials: len(origins) == 1 && origins[0] == "*" == false,
+		MaxAge:           12 * time.Hour,
+	})
 }

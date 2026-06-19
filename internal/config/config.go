@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -17,8 +18,15 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port   int    `yaml:"port"`
-	APIKey string `yaml:"api_key"`
+	Port   int        `yaml:"port"`
+	APIKey string     `yaml:"api_key"`
+	CORS   CORSConfig `yaml:"cors"`
+}
+
+type CORSConfig struct {
+	// AllowOrigins daftar origin yang diizinkan, contoh: ["https://app.klien.com"]
+	// Default: ["*"] (semua origin diizinkan)
+	AllowOrigins []string `yaml:"allow_origins"`
 }
 
 type LLMConfig struct {
@@ -73,6 +81,9 @@ func overrideFromEnv(cfg *Config) {
 	}
 	if v := os.Getenv("SERVER_API_KEY"); v != "" {
 		cfg.Server.APIKey = v
+	}
+	if v := os.Getenv("CORS_ALLOW_ORIGINS"); v != "" {
+		cfg.Server.CORS.AllowOrigins = strings.Split(v, ",")
 	}
 	if v := os.Getenv("LLM_BASE_URL"); v != "" {
 		cfg.LLM.BaseURL = v
