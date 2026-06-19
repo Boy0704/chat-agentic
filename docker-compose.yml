@@ -9,9 +9,12 @@ services:
       - LLM_API_KEY=${LLM_API_KEY}
       - LLM_MODEL=${LLM_MODEL}
       - DB_PATH=/app/data/agent.db
+      - LOG_PATH=/app/logs/agent.log
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
       - ./data:/app/data               # SQLite file, mudah di-backup
       - ./custom-skills:/app/custom-skills
+      - ./logs:/app/logs               # log files, di-rotate otomatis
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]

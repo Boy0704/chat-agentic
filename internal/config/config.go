@@ -136,6 +136,12 @@ func overrideFromEnv(cfg *Config) {
 	if v := os.Getenv("CUSTOM_SKILLS_PATH"); v != "" {
 		cfg.Skills.CustomPath = v
 	}
+	if v := os.Getenv("LOG_PATH"); v != "" {
+		cfg.Log.Path = v
+	}
+	if v := os.Getenv("LOG_LEVEL"); v != "" {
+		cfg.Log.Level = v
+	}
 }
 
 func (c *Config) Validate() error {
