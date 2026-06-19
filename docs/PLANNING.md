@@ -121,34 +121,34 @@ Custom skill memberi klien kontrol penuh atas cara mereka fetch data.
 
 ---
 
-## Milestone 3 — Production Ready
+## Milestone 3 — Production Ready ✅
 
 > Goal: Bisa diinstall di server klien dengan mudah, aman, dan stable.
 
 ### Security
-- [ ] Rate limiting per IP atau per API key
-- [ ] Request body size limit
-- [ ] Timeout untuk LLM call (configurable)
-- [ ] Timeout untuk script skill execution
-- [ ] Sanitasi stderr dari script skill sebelum dikembalikan ke client
+- [x] Rate limiting per IP atau per API key (`server.rate_limit` di config, sliding window in-memory)
+- [x] Request body size limit (`server.max_body_bytes`, default 1 MB)
+- [x] Timeout untuk LLM call (configurable — `llm.timeout_seconds`, applied per API call)
+- [x] Timeout untuk script skill execution (`skills.timeout_seconds`, default 30s)
+- [x] Sanitasi stderr dari script skill sebelum dikembalikan ke client (truncate 500 chars, strip control chars)
 
 ### Observability
-- [ ] Log structured untuk setiap request (method, path, status, latency)
-- [ ] Log setiap skill yang dieksekusi (name, duration, success/error)
-- [ ] Log LLM token usage per request
-- [ ] `GET /health` extended — cek koneksi DB + ping LLM
-- [ ] `GET /metrics` Prometheus (opsional)
+- [x] Log structured untuk setiap request (method, path, status, latency) — custom slog middleware
+- [x] Log setiap skill yang dieksekusi (name, duration_ms, success/error)
+- [x] Log LLM token usage per request (prompt/completion/total tokens)
+- [x] `GET /health` extended — cek koneksi DB + ping LLM (returns `checks` map)
+- [ ] `GET /metrics` Prometheus (opsional — skip untuk sekarang)
 
 ### Configuration & Installation
-- [ ] Validasi `client_api.base_url` — warn jika kosong dan ada skill yang butuhnya
-- [ ] README instalasi lengkap
-- [ ] Script instalasi one-liner
+- [x] Validasi `client_api.base_url` — warn jika kosong dan ada skill yang butuhnya
+- [x] README instalasi lengkap (sudah ada README.md)
+- [x] Script instalasi one-liner (`scripts/install.sh`)
 
 ### Docker & Deployment
-- [ ] Health check di docker-compose
-- [ ] Volume untuk `./data` (SQLite) dan `./custom-skills`
-- [ ] `.env.example` lengkap
-- [ ] Verifikasi image size < 50MB
+- [x] Health check di docker-compose (`wget -qO- /health`, 30s interval)
+- [x] Volume untuk `./data` (SQLite) dan `./custom-skills`
+- [x] `.env.example` lengkap
+- [ ] Verifikasi image size < 50MB (perlu build + check)
 
 ### Testing Milestone 3
 - [ ] Install dari scratch via docker-compose
@@ -301,7 +301,7 @@ process.stdout.write(JSON.stringify(result))
 
 | Milestone | Status |
 |---|---|
-| M1 — Foundation | ✅ Complete (pending manual test) |
-| M2 — Streaming SSE | 🔲 Not Started |
-| M3 — Production Ready | 🔲 Not Started |
+| M1 — Foundation | ✅ Complete |
+| M2 — Streaming SSE | ✅ Complete |
+| M3 — Production Ready | ✅ Complete (pending manual test) |
 | M4 — Multi-App Support | 🔲 Not Started |

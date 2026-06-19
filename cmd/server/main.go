@@ -73,8 +73,8 @@ func main() {
 
 	registry := skill.NewRegistry(deps)
 
-	// Load custom skills dari direktori klien
-	customSkills, err := skills.LoadFromDir(cfg.Skills.CustomPath, logger)
+	skillTimeout := time.Duration(cfg.Skills.TimeoutSeconds) * time.Second
+	customSkills, err := skills.LoadFromDir(cfg.Skills.CustomPath, logger, skillTimeout)
 	if err != nil {
 		logger.Error("load custom skills", "error", err)
 		os.Exit(1)
@@ -88,15 +88,19 @@ func main() {
 
 	if len(customSkills) == 0 {
 		logger.Warn("tidak ada skill yang dimuat — set skills.custom_path di config.yaml")
+	} else if cfg.ClientAPI.BaseURL == "" {
+		logger.Warn("client_api.base_url tidak di-set — skill yang memanggil client API akan gagal")
 	}
 
 	llmCfg := openai.DefaultConfig(cfg.LLM.APIKey)
 	llmCfg.BaseURL = cfg.LLM.BaseURL
 	llmClient := openai.NewClientWithConfig(llmCfg)
 
-	agentSvc := agent.New(llmClient, cfg.LLM.Model, registry, logger)
-	handler := api.NewHandler(agentSvc, sessionStore, registry)
-	router := api.SetupRouter(handler, cfg.Server.APIKey, cfg.Server.CORS)
+	llmTimeout := time.Duration(cfg.LLM.TimeoutSeconds) * time.Second
+	agentSvc := agent.New(llmClient, cfg.LLM.Model, registry, logger, llmTimeout)
+
+	handler := api.NewHandler(agentSvc, sessionStore, registry, cfg.LLM.BaseURL)
+	router := api.SetupRouter(handler, cfg.Server, logger)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),

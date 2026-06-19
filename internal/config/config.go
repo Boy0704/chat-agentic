@@ -18,9 +18,16 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port   int        `yaml:"port"`
-	APIKey string     `yaml:"api_key"`
-	CORS   CORSConfig `yaml:"cors"`
+	Port         int             `yaml:"port"`
+	APIKey       string          `yaml:"api_key"`
+	CORS         CORSConfig      `yaml:"cors"`
+	RateLimit    RateLimitConfig `yaml:"rate_limit"`
+	MaxBodyBytes int64           `yaml:"max_body_bytes"`
+}
+
+type RateLimitConfig struct {
+	Enabled           bool `yaml:"enabled"`
+	RequestsPerMinute int  `yaml:"requests_per_minute"`
 }
 
 type CORSConfig struct {
@@ -49,14 +56,20 @@ type ClientAPIConfig struct {
 }
 
 type SkillsConfig struct {
-	CustomPath string `yaml:"custom_path"`
+	CustomPath     string `yaml:"custom_path"`
+	TimeoutSeconds int    `yaml:"timeout_seconds"`
 }
 
 func Load(path string) (*Config, error) {
 	cfg := &Config{
-		Server:    ServerConfig{Port: 8080},
+		Server: ServerConfig{
+			Port:         8080,
+			MaxBodyBytes: 1 * 1024 * 1024, // 1 MB
+			RateLimit:    RateLimitConfig{Enabled: false, RequestsPerMinute: 60},
+		},
 		LLM:       LLMConfig{TimeoutSeconds: 30},
 		ClientAPI: ClientAPIConfig{TimeoutSeconds: 10},
+		Skills:    SkillsConfig{TimeoutSeconds: 30},
 	}
 
 	if path != "" {

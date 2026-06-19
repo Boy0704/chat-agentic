@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log/slog"
 	"time"
 
 	"agent-service/internal/config"
@@ -9,22 +10,30 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRouter(h *Handler, apiKey string, corsCfg config.CORSConfig) *gin.Engine {
+func SetupRouter(h *Handler, cfg config.ServerConfig, logger *slog.Logger) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
-	r.Use(gin.Logger())
-	r.Use(corsMiddleware(corsCfg))
+	r.Use(SlogLogger(logger))
+	r.Use(corsMiddleware(cfg.CORS))
+
+	if cfg.MaxBodyBytes > 0 {
+		r.Use(BodySizeLimit(cfg.MaxBodyBytes))
+	}
 
 	r.GET("/health", h.Health)
 
-	v1 := r.Group("/api/v1", AuthMiddleware(apiKey))
-	{
-		v1.POST("/chat", h.Chat)
-		v1.POST("/chat/stream", h.ChatStream)
-		v1.GET("/sessions/:id", h.GetSession)
-		v1.DELETE("/sessions/:id", h.DeleteSession)
-		v1.GET("/skills", h.ListSkills)
+	v1 := r.Group("/api/v1", AuthMiddleware(cfg.APIKey))
+
+	if cfg.RateLimit.Enabled && cfg.RateLimit.RequestsPerMinute > 0 {
+		rl := newIPRateLimiter(cfg.RateLimit.RequestsPerMinute)
+		v1.Use(RateLimitMiddleware(rl))
 	}
+
+	v1.POST("/chat", h.Chat)
+	v1.POST("/chat/stream", h.ChatStream)
+	v1.GET("/sessions/:id", h.GetSession)
+	v1.DELETE("/sessions/:id", h.DeleteSession)
+	v1.GET("/skills", h.ListSkills)
 
 	return r
 }

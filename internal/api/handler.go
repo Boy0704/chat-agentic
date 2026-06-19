@@ -18,13 +18,14 @@ import (
 )
 
 type Handler struct {
-	agent    *agent.Agent
-	sessions *session.Store
-	registry *skill.Registry
+	agent      *agent.Agent
+	sessions   *session.Store
+	registry   *skill.Registry
+	llmBaseURL string
 }
 
-func NewHandler(a *agent.Agent, s *session.Store, r *skill.Registry) *Handler {
-	return &Handler{agent: a, sessions: s, registry: r}
+func NewHandler(a *agent.Agent, s *session.Store, r *skill.Registry, llmBaseURL string) *Handler {
+	return &Handler{agent: a, sessions: s, registry: r, llmBaseURL: llmBaseURL}
 }
 
 type ChatRequest struct {
@@ -59,9 +60,9 @@ func (h *Handler) Chat(c *gin.Context) {
 	}
 
 	result, err := h.agent.Run(c.Request.Context(), agent.RunInput{
-		Message:   req.Message,
-		History:   history,
-		AppContext: req.AppContext,
+		Message:    req.Message,
+		History:    history,
+		AppContext:  req.AppContext,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -101,14 +102,14 @@ func (h *Handler) ChatStream(c *gin.Context) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
-	c.Header("X-Accel-Buffering", "no") // disable nginx buffering if behind proxy
+	c.Header("X-Accel-Buffering", "no")
 
 	eventCh := make(chan agent.Event, 16)
 
 	go h.agent.RunStream(c.Request.Context(), agent.RunInput{
-		Message:   req.Message,
-		History:   history,
-		AppContext: req.AppContext,
+		Message:    req.Message,
+		History:    history,
+		AppContext:  req.AppContext,
 	}, eventCh)
 
 	var (
@@ -184,5 +185,41 @@ func (h *Handler) DeleteSession(c *gin.Context) {
 }
 
 func (h *Handler) Health(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": "ok", "version": "1.0.0"})
+	checks := map[string]string{}
+	status := "ok"
+	httpStatus := http.StatusOK
+
+	// DB check
+	pingCtx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
+	if err := h.sessions.Ping(pingCtx); err != nil {
+		checks["db"] = "error: " + err.Error()
+		status = "degraded"
+		httpStatus = http.StatusServiceUnavailable
+	} else {
+		checks["db"] = "ok"
+	}
+
+	// LLM reachability check (quick HTTP probe — any HTTP response counts as reachable)
+	if h.llmBaseURL != "" {
+		llmCtx, llmCancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+		defer llmCancel()
+		req, _ := http.NewRequestWithContext(llmCtx, http.MethodGet, h.llmBaseURL, nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			checks["llm"] = "unreachable"
+			if status == "ok" {
+				status = "degraded"
+			}
+		} else {
+			resp.Body.Close()
+			checks["llm"] = "ok"
+		}
+	}
+
+	c.JSON(httpStatus, gin.H{
+		"status":  status,
+		"version": "1.0.0",
+		"checks":  checks,
+	})
 }

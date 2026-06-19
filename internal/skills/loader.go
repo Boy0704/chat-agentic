@@ -7,13 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"agent-service/internal/skill"
 )
 
 // LoadFromDir membaca semua file *.manifest.json dari direktori,
 // lalu mencari script pasangannya (.py, .js, .sh) dengan nama yang sama.
-func LoadFromDir(dir string, logger *slog.Logger) ([]skill.Skill, error) {
+func LoadFromDir(dir string, logger *slog.Logger, timeout time.Duration) ([]skill.Skill, error) {
 	if dir == "" {
 		return nil, nil
 	}
@@ -48,7 +49,7 @@ func LoadFromDir(dir string, logger *slog.Logger) ([]skill.Skill, error) {
 			)
 		}
 
-		loaded = append(loaded, NewScriptSkill(*m, scriptPath))
+		loaded = append(loaded, NewScriptSkill(*m, scriptPath, timeout))
 		logger.Info("custom skill loaded", "name", m.Name, "script", filepath.Base(scriptPath))
 	}
 	return loaded, nil

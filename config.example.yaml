@@ -1,6 +1,15 @@
 server:
   port: 8080
   api_key: "your-secret-api-key"
+
+  # Ukuran maksimum request body (bytes). Default: 1MB.
+  max_body_bytes: 1048576
+
+  # Rate limiting per IP (opsional). Default: off.
+  rate_limit:
+    enabled: false
+    requests_per_minute: 60
+
   cors:
     # Daftar origin yang diizinkan akses API ini.
     # Default: semua origin diizinkan ["*"]
@@ -12,7 +21,7 @@ llm:
   base_url: "https://api.openai.com/v1"  # atau http://localhost:11434/v1 untuk Ollama
   api_key: "sk-xxx"
   model: "gpt-4o"
-  timeout_seconds: 30
+  timeout_seconds: 30                    # timeout per LLM API call
 
 db:
   path: "./data/agent.db"   # SQLite untuk sessions, dibuat otomatis
@@ -26,3 +35,4 @@ client_api:
 
 skills:
   custom_path: "./custom-skills/"     # folder berisi skill klien (.py/.js + .manifest.json)
+  timeout_seconds: 30                 # timeout per eksekusi script skill

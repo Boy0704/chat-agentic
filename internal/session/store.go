@@ -78,6 +78,10 @@ func (s *Store) Delete(ctx context.Context, sessionID string) error {
 	return err
 }
 
+func (s *Store) Ping(ctx context.Context) error {
+	return s.db.PingContext(ctx)
+}
+
 func (s *Store) GetHistory(ctx context.Context, sessionID string) ([]MessageRow, error) {
 	var rows []MessageRow
 	err := s.db.SelectContext(ctx, &rows,

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"strings"
+	"time"
 
 	"agent-service/internal/skill"
 
@@ -16,25 +17,27 @@ import (
 )
 
 type Agent struct {
-	client   *openai.Client
-	model    string
-	registry *skill.Registry
-	logger   *slog.Logger
+	client     *openai.Client
+	model      string
+	registry   *skill.Registry
+	logger     *slog.Logger
+	llmTimeout time.Duration
 }
 
-func New(client *openai.Client, model string, registry *skill.Registry, logger *slog.Logger) *Agent {
+func New(client *openai.Client, model string, registry *skill.Registry, logger *slog.Logger, llmTimeout time.Duration) *Agent {
 	return &Agent{
-		client:   client,
-		model:    model,
-		registry: registry,
-		logger:   logger,
+		client:     client,
+		model:      model,
+		registry:   registry,
+		logger:     logger,
+		llmTimeout: llmTimeout,
 	}
 }
 
 type RunInput struct {
-	Message   string
-	History   []openai.ChatCompletionMessage
-	AppContext map[string]any
+	Message    string
+	History    []openai.ChatCompletionMessage
+	AppContext  map[string]any
 }
 
 type RunResult struct {
@@ -51,11 +54,13 @@ func (a *Agent) Run(ctx context.Context, input RunInput) (RunResult, error) {
 	var totalUsage openai.Usage
 
 	for {
-		resp, err := a.client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+		llmCtx, cancel := a.withLLMTimeout(ctx)
+		resp, err := a.client.CreateChatCompletion(llmCtx, openai.ChatCompletionRequest{
 			Model:    a.model,
 			Messages: messages,
 			Tools:    tools,
 		})
+		cancel()
 		if err != nil {
 			return RunResult{}, fmt.Errorf("llm call: %w", err)
 		}
@@ -63,6 +68,11 @@ func (a *Agent) Run(ctx context.Context, input RunInput) (RunResult, error) {
 		totalUsage.PromptTokens += resp.Usage.PromptTokens
 		totalUsage.CompletionTokens += resp.Usage.CompletionTokens
 		totalUsage.TotalTokens += resp.Usage.TotalTokens
+		a.logger.InfoContext(ctx, "llm usage",
+			"prompt_tokens", resp.Usage.PromptTokens,
+			"completion_tokens", resp.Usage.CompletionTokens,
+			"total_tokens", resp.Usage.TotalTokens,
+		)
 
 		choice := resp.Choices[0]
 		messages = append(messages, choice.Message)
@@ -90,12 +100,17 @@ func (a *Agent) RunStream(ctx context.Context, input RunInput, eventCh chan<- Ev
 	messageID := uuid.New().String()
 
 	for {
-		stream, err := a.client.CreateChatCompletionStream(ctx, openai.ChatCompletionRequest{
+		llmCtx, cancel := a.withLLMTimeout(ctx)
+		stream, err := a.client.CreateChatCompletionStream(llmCtx, openai.ChatCompletionRequest{
 			Model:    a.model,
 			Messages: messages,
 			Tools:    tools,
+			StreamOptions: &openai.StreamOptions{
+				IncludeUsage: true,
+			},
 		})
 		if err != nil {
+			cancel()
 			eventCh <- Event{Type: EventTypeError, Error: err.Error()}
 			return
 		}
@@ -113,9 +128,20 @@ func (a *Agent) RunStream(ctx context.Context, input RunInput, eventCh chan<- Ev
 			}
 			if err != nil {
 				stream.Close()
+				cancel()
 				eventCh <- Event{Type: EventTypeError, Error: err.Error()}
 				return
 			}
+
+			// Log usage from the final chunk (when IncludeUsage is set)
+			if chunk.Usage != nil && chunk.Usage.TotalTokens > 0 {
+				a.logger.InfoContext(ctx, "llm usage (stream)",
+					"prompt_tokens", chunk.Usage.PromptTokens,
+					"completion_tokens", chunk.Usage.CompletionTokens,
+					"total_tokens", chunk.Usage.TotalTokens,
+				)
+			}
+
 			if len(chunk.Choices) == 0 {
 				continue
 			}
@@ -125,20 +151,18 @@ func (a *Agent) RunStream(ctx context.Context, input RunInput, eventCh chan<- Ev
 				finishReason = choice.FinishReason
 			}
 
-			// Stream text tokens to client
 			if choice.Delta.Content != "" {
 				fullContent.WriteString(choice.Delta.Content)
 				eventCh <- Event{Type: EventTypeToken, Content: choice.Delta.Content}
 			}
 
-			// Accumulate tool calls — they arrive in fragments across chunks
 			for _, tc := range choice.Delta.ToolCalls {
 				accumulateToolCall(&toolCalls, tc)
 			}
 		}
 		stream.Close()
+		cancel()
 
-		// Add full assistant turn to history
 		messages = append(messages, openai.ChatCompletionMessage{
 			Role:      openai.ChatMessageRoleAssistant,
 			Content:   fullContent.String(),
@@ -154,7 +178,6 @@ func (a *Agent) RunStream(ctx context.Context, input RunInput, eventCh chan<- Ev
 			return
 		}
 
-		// Execute tool calls and continue the loop
 		messages, skillsUsed = a.executeToolCalls(ctx, messages, toolCalls, skillsUsed, input.AppContext, eventCh)
 	}
 }
@@ -176,22 +199,24 @@ func (a *Agent) executeToolCalls(
 		if eventCh != nil {
 			eventCh <- Event{Type: EventTypeSkillStart, Skill: skillName}
 		}
-		a.logger.InfoContext(ctx, "executing skill", "skill", skillName)
 
 		var params map[string]any
 		if err := json.Unmarshal([]byte(tc.Function.Arguments), &params); err != nil {
 			params = map[string]any{}
 		}
 
+		start := time.Now()
 		result, err := a.registry.Execute(ctx, skillName, params, appCtx)
+		dur := time.Since(start)
 
 		var toolContent string
 		if err != nil {
 			toolContent = fmt.Sprintf("Error: %s", err.Error())
-			a.logger.ErrorContext(ctx, "skill error", "skill", skillName, "error", err)
+			a.logger.ErrorContext(ctx, "skill error", "skill", skillName, "duration_ms", dur.Milliseconds(), "error", err)
 		} else {
 			b, _ := json.Marshal(result)
 			toolContent = string(b)
+			a.logger.InfoContext(ctx, "skill done", "skill", skillName, "duration_ms", dur.Milliseconds())
 			if eventCh != nil {
 				eventCh <- Event{Type: EventTypeSkillResult, Skill: skillName, Summary: result.Summary}
 			}
@@ -206,8 +231,15 @@ func (a *Agent) executeToolCalls(
 	return messages, skillsUsed
 }
 
+// withLLMTimeout wraps ctx with the configured LLM timeout. Caller must call cancel().
+func (a *Agent) withLLMTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if a.llmTimeout > 0 {
+		return context.WithTimeout(ctx, a.llmTimeout)
+	}
+	return ctx, func() {}
+}
+
 // accumulateToolCall merges a streaming tool call delta into the accumulator slice.
-// Tool calls arrive fragmented across chunks — Index tells us which slot to merge into.
 func accumulateToolCall(toolCalls *[]openai.ToolCall, delta openai.ToolCall) {
 	idx := 0
 	if delta.Index != nil {
