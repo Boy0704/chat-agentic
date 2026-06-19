@@ -99,19 +99,20 @@ Custom skill memberi klien kontrol penuh atas cara mereka fetch data.
 
 ---
 
-## Milestone 2 — Streaming SSE
+## Milestone 2 — Streaming SSE ✅
 
 > Goal: Streaming response real-time, user lihat output token per token.
 
 ### Streaming
-- [ ] `POST /api/v1/chat/stream` handler — SSE
-- [ ] `Agent.RunStream()` — kirim events ke channel
-- [ ] Stream token dari LLM (delta content)
-- [ ] Emit `skill_start` event sebelum skill dieksekusi
-- [ ] Emit `skill_result` event setelah skill selesai
-- [ ] Emit `done` event dengan metadata
-- [ ] Emit `error` event jika gagal
-- [ ] Test via `curl -N`
+- [x] `POST /api/v1/chat/stream` handler — SSE
+- [x] `Agent.RunStream()` — kirim events ke channel
+- [x] Stream token dari LLM (delta content)
+- [x] Emit `skill_start` event sebelum skill dieksekusi
+- [x] Emit `skill_result` event setelah skill selesai
+- [x] Emit `done` event dengan metadata
+- [x] Emit `error` event jika gagal
+- [x] `accumulateToolCall()` — gabungkan tool call fragments dari stream chunks
+- [x] Session tersimpan setelah stream selesai
 
 ### Testing Milestone 2
 - [ ] Streaming response muncul token per token

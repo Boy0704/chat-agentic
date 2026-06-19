@@ -74,9 +74,19 @@ STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE -H "$AUTH" \
 echo "HTTP Status: $STATUS (expected 204)"
 echo ""
 
-# ── 9. Unauthorized request ──────────────
-echo "[9] Request tanpa auth (harus 401)"
-STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/api/v1/chat" \
+# ── 9. Streaming SSE ─────────────────────
+echo "[9] POST /api/v1/chat/stream — streaming response"
+echo "(Ctrl+C untuk stop jika LLM lambat)"
+curl -sN -X POST "$BASE_URL/api/v1/chat/stream" \
+    -H "$AUTH" -H "$CT" \
+    -d "{\"session_id\":\"stream-test\",\"message\":\"Halo, ceritakan sedikit tentang dirimu\"}" \
+    --max-time 30
+echo ""
+echo ""
+
+# ── 10. Unauthorized request ─────────────
+echo "[10] Request tanpa auth (harus 401)"
+STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/api/v1/chat/stream" \
     -H "$CT" -d "{\"message\":\"test\"}")
 echo "HTTP Status: $STATUS (expected 401)"
 echo ""

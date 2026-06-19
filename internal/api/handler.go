@@ -1,7 +1,13 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
+	"time"
 
 	"agent-service/internal/agent"
 	"agent-service/internal/session"
@@ -73,6 +79,69 @@ func (h *Handler) Chat(c *gin.Context) {
 		SkillsUsed: result.SkillsUsed,
 		Usage:      result.Usage,
 	})
+}
+
+func (h *Handler) ChatStream(c *gin.Context) {
+	var req ChatRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.SessionID == "" {
+		req.SessionID = uuid.New().String()
+	}
+
+	history, err := h.sessions.Get(c.Request.Context(), req.SessionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load session"})
+		return
+	}
+
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no") // disable nginx buffering if behind proxy
+
+	eventCh := make(chan agent.Event, 16)
+
+	go h.agent.RunStream(c.Request.Context(), agent.RunInput{
+		Message:   req.Message,
+		History:   history,
+		AppContext: req.AppContext,
+	}, eventCh)
+
+	var (
+		fullReply  strings.Builder
+		skillsUsed []string
+	)
+
+	c.Stream(func(w io.Writer) bool {
+		event, ok := <-eventCh
+		if !ok {
+			return false
+		}
+
+		if event.Type == agent.EventTypeToken {
+			fullReply.WriteString(event.Content)
+		}
+		if event.Type == agent.EventTypeDone {
+			skillsUsed = event.SkillsUsed
+		}
+
+		data, _ := json.Marshal(event)
+		fmt.Fprintf(w, "data: %s\n\n", data)
+		return true
+	})
+
+	// Save to session after stream ends.
+	// Use a fresh context — the request context is already cancelled at this point.
+	if fullReply.Len() > 0 {
+		saveCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = h.sessions.Append(saveCtx, req.SessionID, req.Message, fullReply.String())
+	}
+	_ = skillsUsed
 }
 
 type skillInfo struct {
