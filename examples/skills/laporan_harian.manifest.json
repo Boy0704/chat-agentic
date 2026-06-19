@@ -1,0 +1,18 @@
+{
+  "name": "laporan_harian",
+  "description": "Generate a daily sales summary report. Returns total transactions, revenue, and top-selling products for a given date.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "tanggal": {
+        "type": "string",
+        "description": "Date in YYYY-MM-DD format. Defaults to today if not provided."
+      },
+      "branch_id": {
+        "type": "string",
+        "description": "Filter by branch ID (optional). Omit to get data from all branches."
+      }
+    },
+    "required": []
+  }
+}
