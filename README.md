@@ -67,6 +67,7 @@ cp examples/skills/cek_stok.py custom-skills/
 **3. Run**
 
 ```bash
+docker-compose build   # installs Python dependencies from custom-skills/requirements.txt
 docker-compose up -d
 ```
 

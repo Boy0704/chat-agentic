@@ -25,6 +25,43 @@ LLM uses summary to compose reply:
 "Indomie Goreng has 48 units and Indomie Rebus has 12 units in stock."
 ```
 
+## Managing Dependencies
+
+### Python
+
+Add packages to `custom-skills/requirements.txt`, then rebuild the Docker image:
+
+```
+# custom-skills/requirements.txt
+requests==2.32.3
+psycopg2-binary==2.9.9
+```
+
+```bash
+docker-compose build   # installs packages into the image
+docker-compose up -d
+```
+
+The `requirements.txt` file is baked into the image at build time. You only need to rebuild when you add or change a dependency — not when you edit skill scripts.
+
+> **Without Docker:** just `pip install` directly on the server.
+
+### Node.js
+
+The built-in Node.js modules (`http`, `https`, `fs`, `url`) cover most use cases and require no installation. For npm packages, install them globally on the server:
+
+```bash
+# Inside the container
+docker-compose exec agent npm install -g axios
+
+# Or on the host without Docker
+npm install -g axios
+```
+
+> npm packages with `node_modules/` folders inside `custom-skills/` are not supported because the folder is volume-mounted and would override the install.
+
+---
+
 ## File Structure
 
 Every skill needs two files in your `custom-skills/` folder:
