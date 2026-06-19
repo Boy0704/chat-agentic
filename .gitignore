@@ -8,6 +8,11 @@ config.yaml
 # SQLite database (data runtime)
 data/
 
+# Custom skills milik klien — jangan di-commit (bisa berisi struktur DB / kredensial)
+custom-skills/*
+# kecuali file .gitkeep supaya folder tetap ada di repo
+!custom-skills/.gitkeep
+
 # Go build cache
 *.test
 *.out
